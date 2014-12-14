@@ -5,6 +5,7 @@ var path = require('path');
 var less = require('less');
 var browserify = require('browserify');
 var ecstatic = require('ecstatic');
+var stringify = require('stringify');
 
 exports.lessMiddleware = function (cssRoot) {
     return function (req, res, next) {
@@ -58,6 +59,7 @@ exports.jsMiddleware = function (browserifyRoot) {
                     entries: [filePath],
                     debug: true //TODO: source maps 的文件路径不对
                 });
+                b.transform(stringify(['.tpl', '.html'])); //TODO: works in node-side
                 b.on('error', function (e) {
                     console.log(e.stack);
                 });
