@@ -16,7 +16,10 @@
   "keywords": [
     "render"
   ],
-  "author": "undoZen <opensource@undozen.com>",
+  "author": {
+    "name": "undoZen",
+    "email": "opensource@undozen.com"
+  },
   "license": "private",
   "peerDependencies": {
     "lodash-node": "^2.4.1",
@@ -28,6 +31,7 @@
   "dependencies": {
     "browserify": "^7.0.1",
     "ecstatic": "^0.5.7",
+    "errto": "^0.2.1",
     "glob": "^4.3.1",
     "less": "^2.1.1",
     "rev-rewriter": "^1.1.0",
