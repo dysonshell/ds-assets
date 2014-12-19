@@ -137,12 +137,17 @@ exports.jsMiddleware = function (appRoot) {
 };
 
 exports.getComponentsCss = function (componentsRoot) {
-    return function (req, res) {
+    return function (req, res, next) {
         var pending = 0;
         var result = [];
         glob('./*/assets/css/component.less', {
             cwd: componentsRoot
         }, function (error, files) {
+            if (error) {
+                return next(error);
+            } else if (!files.length) {
+                return done();
+            }
             files.forEach(function (filePath) {
                 pending += 1;
                 var fullFilePath = path.join(componentsRoot, filePath);
