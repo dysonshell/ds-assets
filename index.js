@@ -10,6 +10,14 @@ var rewrite = require('rev-rewriter');
 var glob = require('glob');
 var errto = require('errto');
 
+function getComponentName(componentsDirName, dirname, filePath) {
+    var componentRegExp = new RegExp('(\\/' + componentsDirName +
+        '\\/[^\\/]+)\\/' + rewrite.escapeRegExp(dirname) + '\\/');
+    console.log(componentRegExp);
+    var match = filePath.match(componentRegExp);
+    return match && match[1];
+}
+
 exports.renderLess = function (filePath, opts, cb) {
     if (typeof opts === 'function') {
         cb = opts;
@@ -39,6 +47,9 @@ exports.renderLess = function (filePath, opts, cb) {
         fs.readFile(filePath, 'utf-8', errto(errcb, render));
     }
 
+    var component = getComponentName(opts.componentsDirName, opts.assetsDirName +
+        '/css', filePath);
+
     function render(contents) {
         less.render(contents, {
             dumpLineNumbers: 'comments',
@@ -47,7 +58,16 @@ exports.renderLess = function (filePath, opts, cb) {
             paths: [path.dirname(filePath)],
             sourceMap: sourceMapOptions
         }, errto(errcb, function (output) {
-            cb(output.css);
+            if (component) {
+                cb(rewrite({
+                    revPost: function (assetFilePath) {
+                        return component + '/' + opts.assetsDirName +
+                            '/' + assetFilePath;
+                    }
+                }, output.css));
+            } else {
+                cb(output.css);
+            }
         }));
     }
 
@@ -66,39 +86,27 @@ exports.lessMiddleware = function (opts) {
         if (!req.url.match(/\.css($|\?)/i)) {
             return next();
         }
-        if (req.path.indexOf('/assets/css/') !== 0 && !opts.componentsDirName) {
+        if (req.path.indexOf('/' + opts.assetsDirName + '/css/') !== 0 && !opts
+            .componentsDirName) {
             return next();
-        }
-        var match;
-        if (opts.componentsDirName && !(match = req.path.match(
-            new RegExp('^(\\/' + opts.componentsDirName +
-                '\\/[^\\/]+)\\/assets\\/css\\/')))) {
-            return next();
-        }
-        var component;
-        if (match) {
-            component = match[1];
         }
         var filePath = path.join(opts.appRoot, req.path.replace(/\.css$/i,
             '.less'));
-        exports.renderLess(filePath, opts, function (css) {
-            if (css.match(/\/\*ERROR:/)) {
-                res.status(500);
-                res.setHeader('Content-Type',
-                    'text/plain; charset=utf-8');
-            } else {
-                res.setHeader('Content-Type',
-                    'text/css; charset=utf-8');
-                if (component) {
-                    css = rewrite({
-                        revPost: function (assetFilePath) {
-                            return component + '/assets/' +
-                                assetFilePath;
-                        }
-                    }, css);
-                }
+        fs.exists(filePath, function (exists) {
+            if (!exists) {
+                return next();
             }
-            res.send(css);
+            exports.renderLess(filePath, opts, function (css) {
+                if (css.match(/\/\*ERROR:/)) {
+                    res.status(500);
+                    res.setHeader('Content-Type',
+                        'text/plain; charset=utf-8');
+                } else {
+                    res.setHeader('Content-Type',
+                        'text/css; charset=utf-8');
+                }
+                res.send(css);
+            });
         });
     };
 };
@@ -113,18 +121,15 @@ exports.jsMiddleware = function (opts) {
         if (!req.url.match(/\.js($|\?)/i)) {
             return next();
         }
-        if (req.path.indexOf('/assets/js/main/') !== 0 && !opts.componentsDirName) {
-            return next();
-        }
-        var match;
-        if (opts.componentsDirName && !(match = req.path.match(
-            new RegExp('^(\\/' + opts.componentsDirName +
-                '\\/[^\\/]+)\\/assets\\/js\\/main\\/')))) {
+        if (req.path.indexOf('/' + opts.assetsDirName + '/js/main/') !== 0 && !
+            opts.componentsDirName) {
             return next();
         }
         var component;
-        if (match) {
-            component = match[1];
+        if (opts.componentsDirName && !(component = getComponentName(opts.componentsDirName,
+            opts.assetsDirName + '/js/main', req.path))) {
+            console.log(component);
+            return next();
         }
         var filePath = path.join(opts.appRoot, req.path);
         fs.exists(filePath, function (exists) {
@@ -151,8 +156,8 @@ exports.jsMiddleware = function (opts) {
                 if (component) {
                     body = rewrite({ //TODO: 写成 browserify transform
                         revPost: function (assetFilePath) {
-                            return component + '/assets/' +
-                                assetFilePath;
+                            return component + '/' + opts.assetsDirName +
+                                '/' + assetFilePath;
                         }
                     }, body);
                 }
@@ -166,11 +171,11 @@ exports.getComponentsCss = function (opts) {
     return function (req, res, next) {
         var pending = 0;
         var result = [];
-        glob('./' + opts.componentsDirName + '/*/assets/css/' + opts.componentsDirName +
+        glob('./' + opts.componentsDirName + '/*/' + opts.assetsDirName +
+            '/css/' + opts.componentsDirName +
             '.less', {
                 cwd: opts.appRoot
             }, function (error, files) {
-                console.log(files);
                 if (error) {
                     return next(error);
                 } else if (!files.length) {
@@ -200,23 +205,21 @@ exports.getComponentsCss = function (opts) {
 exports.argmentApp = function (app, opts) {
     opts = opts || {};
     if (app.get('env') === 'development') { // 只在开发环境做即时编译
-        //app.use(exports.lessMiddleware(opts));
-        /*if (opts.libJs) {
-            app.get('/assets/js/lib.js', exports.getJsLib(opts.assetsRoot));
-        }*/
         if (typeof opts.appRoot === 'string') {
             app.use(exports.jsMiddleware(opts));
             app.use(exports.lessMiddleware(opts));
-            if (typeof opts.componentsDirName === 'string') {
-                var componentsRoot = path.join(opts.appRoot, opts.componentsDirName);
-                app.get('/assets/css/' + opts.componentsDirName + '.css',
+            if (typeof opts.componentsDirName === 'string' && typeof opts.componentsDirName ===
+                'string') {
+                app.get('/' + opts.assetsDirName + '/css/' + opts.componentsDirName +
+                    '.css',
                     exports.getComponentsCss(opts));
                 app.use('/' + opts.componentsDirName, ecstatic(
-                    componentsRoot));
+                    path.join(opts.appRoot, opts.componentsDirName)));
             }
         }
-        if (typeof opts.assetsRoot === 'string') {
-            app.use('/assets', ecstatic(opts.assetsRoot));
+        if (typeof opts.assetsDirName === 'string') {
+            app.use('/' + opts.assetsDirName, ecstatic(path.join(opts.appRoot,
+                opts.assetsDirName)));
         }
         if (app.get('env') !== 'production' && typeof opts.appRoot ===
             'string') {
