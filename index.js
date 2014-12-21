@@ -120,13 +120,13 @@ exports.jsMiddleware = function (opts) {
         if (!req.url.match(/\.js($|\?)/i)) {
             return next();
         }
-        if (req.path.indexOf('/' + opts.assetsDirName + '/js/main/') !== 0 && !
-            opts.componentsDirName) {
-            return next();
-        }
         var component;
-        if (opts.componentsDirName && !(component = getComponentName(opts.componentsDirName,
-            opts.assetsDirName + '/js/main', req.path))) {
+        if (opts.componentsDirName) {
+            component = getComponentName(opts.componentsDirName,
+                opts.assetsDirName + '/js/main', req.path);
+        }
+        if (req.path.indexOf('/' + opts.assetsDirName + '/js/main/') !== 0 && !
+            component) {
             return next();
         }
         var filePath = path.join(opts.appRoot, req.path);
