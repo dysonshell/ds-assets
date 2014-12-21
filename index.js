@@ -13,7 +13,6 @@ var errto = require('errto');
 function getComponentName(componentsDirName, dirname, filePath) {
     var componentRegExp = new RegExp('(\\/' + componentsDirName +
         '\\/[^\\/]+)\\/' + rewrite.escapeRegExp(dirname) + '\\/');
-    console.log(componentRegExp);
     var match = filePath.match(componentRegExp);
     return match && match[1];
 }
@@ -128,7 +127,6 @@ exports.jsMiddleware = function (opts) {
         var component;
         if (opts.componentsDirName && !(component = getComponentName(opts.componentsDirName,
             opts.assetsDirName + '/js/main', req.path))) {
-            console.log(component);
             return next();
         }
         var filePath = path.join(opts.appRoot, req.path);
