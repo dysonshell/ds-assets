@@ -10,6 +10,9 @@ var rewrite = require('rev-rewriter');
 var glob = require('glob');
 var errto = require('errto');
 
+var rewriteComponentSource = require('@ds/render')
+    .rewriteComponentSource;
+
 function getComponentName(componentsDirName, dirname, filePath) {
     var componentRegExp = new RegExp('(\\/' + componentsDirName +
         '\\/[^\\/]+)\\/' + rewrite.escapeRegExp(dirname) + '\\/');
@@ -46,8 +49,7 @@ exports.renderLess = function (filePath, opts, cb) {
         fs.readFile(filePath, 'utf-8', errto(errcb, render));
     }
 
-    var component = getComponentName(opts.componentsDirName, opts.assetsDirName +
-        '/css', filePath);
+    var component = getComponentName(opts.componentsDirName, 'css', filePath);
 
     function render(contents) {
         less.render(contents, {
@@ -58,12 +60,7 @@ exports.renderLess = function (filePath, opts, cb) {
             sourceMap: sourceMapOptions
         }, errto(errcb, function (output) {
             if (component) {
-                cb(rewrite({
-                    revPost: function (assetFilePath) {
-                        return component + '/' + opts.assetsDirName +
-                            '/' + assetFilePath;
-                    }
-                }, output.css));
+                cb(rewriteComponentSource(filePath, output.css));
             } else {
                 cb(output.css);
             }
@@ -122,11 +119,10 @@ exports.jsMiddleware = function (opts) {
         }
         var component;
         if (opts.componentsDirName) {
-            component = getComponentName(opts.componentsDirName,
-                opts.assetsDirName + '/js/main', req.path);
+            component = getComponentName(opts.componentsDirName, 'js/main', req
+                .path);
         }
-        if (req.path.indexOf('/' + opts.assetsDirName + '/js/main/') !== 0 && !
-            component) {
+        if (req.path.indexOf('/js/main/') === -1 && !component) {
             return next();
         }
         var filePath = path.join(opts.appRoot, req.path);
@@ -152,12 +148,7 @@ exports.jsMiddleware = function (opts) {
                 }
                 res.type('js');
                 if (component) {
-                    body = rewrite({ //TODO: 写成 browserify transform
-                        revPost: function (assetFilePath) {
-                            return component + '/' + opts.assetsDirName +
-                                '/' + assetFilePath;
-                        }
-                    }, body);
+                    body = rewriteComponentSource(filePath, body); //TODO: 写成 browserify transform
                 }
                 res.send(body);
             });
@@ -169,7 +160,7 @@ exports.getComponentsCss = function (opts) {
     return function (req, res, next) {
         var pending = 0;
         var result = [];
-        glob('./' + opts.componentsDirName + '/*/' + opts.assetsDirName +
+        glob('./' + opts.componentsDirName + '/*/' +
             '/css/' + opts.componentsDirName +
             '.less', {
                 cwd: opts.appRoot
