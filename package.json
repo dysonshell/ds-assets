@@ -25,7 +25,8 @@
     "tape": "^3.0.3"
   },
   "peerDependencies": {
-    "@ds/render": "^0.3.0"
+    "@ds/base": "^0.2.0",
+    "@ds/render": "^0.4.0"
   },
   "dependencies": {
     "browserify": "^7.0.1",
