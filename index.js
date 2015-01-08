@@ -3,7 +3,7 @@
 var fs = require('fs');
 var path = require('path');
 var less = require('less');
-var rewrite = require('rev-rewriter');
+var rewrite = require('@ds/render/node_modules/rev-rewriter');
 var errto = require('errto');
 
 var rewriteComponentSource = require('@ds/render')
