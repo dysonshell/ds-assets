@@ -3,7 +3,7 @@
 var fs = require('fs');
 var path = require('path');
 var less = require('less');
-var rewrite = require('@ds/render/node_modules/rev-rewriter');
+var rewrite = require('rev-rewriter');
 var errto = require('errto');
 
 var rewriteComponentSource = require('@ds/render')
@@ -149,14 +149,14 @@ exports.argmentApp = function (app, opts) {
             app.use(exports.lessMiddleware(opts));
             if (typeof opts.componentsDirName === 'string') {
                 app.use('/' + opts.componentsDirName, serveStatic(
-                    path.join(opts.appRoot, opts.componentsDirName)), false);
+                    path.join(opts.appRoot, opts.componentsDirName), false));
             }
             app.use('/node_modules', serveStatic(path.join(opts.appRoot,
-                'node_modules')), false);
+                'node_modules'), false));
         }
         if (typeof opts.assetsDirName === 'string') {
             app.use('/' + opts.assetsDirName, serveStatic(path.join(opts.appRoot,
-                opts.assetsDirName)), false);
+                opts.assetsDirName), false));
         }
     } else {
         if (typeof opts.appRoot === 'string') {

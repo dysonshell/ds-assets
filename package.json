@@ -31,7 +31,7 @@
   "dependencies": {
     "errto": "^0.2.1",
     "less": "^2.1.1",
-    "rev-rewriter": "^1.1.0",
+    "rev-rewriter": "^1.1.1",
     "st": "^0.5.2"
   }
 }
