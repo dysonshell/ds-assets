@@ -49,11 +49,12 @@ exports.renderLess = function (filePath, opts, cb) {
 
     function render(contents) {
         less.render(contents, {
-            dumpLineNumbers: 'comments',
+            dumpLineNumbers: opts.debug && 'comments',
             filename: filePath,
             relativeUrls: true,
             paths: [path.dirname(filePath)],
-            sourceMap: sourceMapOptions
+            sourceMap: opts.debug && sourceMapOptions,
+            compress: !opts.debug
         }, errto(errcb, function (output) {
             if (component) {
                 cb(rewriteComponentSource(filePath, output.css));
