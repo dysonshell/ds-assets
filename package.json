@@ -24,13 +24,10 @@
   "devDependencies": {
     "tape": "^3.0.3"
   },
-  "peerDependencies": {
-    "@ds/base": "^0.2.0",
-    "@ds/render": "^0.5.0"
-  },
   "dependencies": {
     "errto": "^0.2.1",
     "less": "^2.1.1",
+    "mq-remove": "0.0.5",
     "rev-rewriter": "^1.1.1",
     "st": "^0.5.2"
   }

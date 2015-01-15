@@ -5,13 +5,13 @@ var path = require('path');
 var less = require('less');
 var rewrite = require('rev-rewriter');
 var errto = require('errto');
+var mqRemove = require('mq-remove');
 
-var rewriteComponentSource = require('@ds/render')
-    .rewriteComponentSource;
+var rewriteComponentSource = require('@ds/rewrite-component-source');
 
-function getComponentName(componentsDirName, dirname, filePath) {
-    var componentRegExp = new RegExp('(\\/' + componentsDirName +
-        '\\/[^\\/]+)\\/' + rewrite.escapeRegExp(dirname) + '\\/');
+function getComponentName(dirname, filePath) {
+    var componentRegExp = new RegExp('(\\/ccc\\/[^\\/]+)\\/' + rewrite.escapeRegExp(
+        dirname) + '\\/');
     var match = filePath.match(componentRegExp);
     return match && match[1];
 }
@@ -27,8 +27,7 @@ exports.renderLess = function (filePath, opts, cb) {
     }
 
     var sourceMapOptions = null;
-    if (!opts.componentsDirName || !filePath.match(new RegExp(opts.componentsDirName +
-        '\\.less$'))) {
+    if (!filePath.match(/ccc\.less$/)) {
         sourceMapOptions = {
             sourceMapFileInline: true,
             outputSourceFiles: true,
@@ -45,7 +44,7 @@ exports.renderLess = function (filePath, opts, cb) {
         fs.readFile(filePath, 'utf-8', errto(errcb, render));
     }
 
-    var component = getComponentName(opts.componentsDirName, 'css', filePath);
+    var component = getComponentName('css', filePath);
 
     function render(contents) {
         less.render(contents, {
@@ -75,15 +74,15 @@ exports.lessMiddleware = function (opts) {
             next();
         };
     }
+    var cssPathRegExp = /(?:\/ccc\/[^\/]+|\/assets)\/.*(\.nmq)?\.css($|\?)/i;
     return function (req, res, next) {
-        if (!req.url.match(/\.css($|\?)/i)) {
+        var match = req.url.match(cssPathRegExp);
+        if (!match) {
             return next();
         }
-        if (req.path.indexOf('/' + opts.assetsDirName + '/css/') !== 0 && !opts
-            .componentsDirName) {
-            return next();
-        }
-        var filePath = path.join(opts.appRoot, req.path.replace(/\.css$/i,
+        var noMediaQueries = !! match[1];
+        var filePath = path.join(opts.appRoot, req.path.replace(
+            /(\.nmq)?\.css$/i,
             '.less'));
         fs.exists(filePath, function (exists) {
             if (!exists) {
@@ -98,7 +97,13 @@ exports.lessMiddleware = function (opts) {
                     res.setHeader('Content-Type',
                         'text/css; charset=utf-8');
                 }
-                res.send(css);
+                if (noMediaQueries) {
+                    res.send(mqRemove(css, {
+                        width: opts.mqRemoveWidth || '1024px'
+                    }));
+                } else {
+                    res.send(css);
+                }
             });
         });
     };
@@ -148,10 +153,7 @@ exports.argmentApp = function (app, opts) {
     if (app.get('env') === 'development') { // 只在开发环境做即时编译
         if (typeof opts.appRoot === 'string') {
             app.use(exports.lessMiddleware(opts));
-            if (typeof opts.componentsDirName === 'string') {
-                app.use('/' + opts.componentsDirName, serveStatic(
-                    path.join(opts.appRoot, opts.componentsDirName), false));
-            }
+            app.use('/ccc', serveStatic(path.join(opts.appRoot, 'ccc'), false));
             app.use('/node_modules', serveStatic(path.join(opts.appRoot,
                 'node_modules'), false));
         }
@@ -161,11 +163,9 @@ exports.argmentApp = function (app, opts) {
         }
     } else {
         if (typeof opts.appRoot === 'string') {
-            if (typeof opts.componentsDirName === 'string') {
-                app.use('/' + opts.componentsDirName, serveStatic(
-                    path.join(opts.appRoot, 'dist', opts.componentsDirName)
-                ));
-            }
+            app.use('/ccc', serveStatic(
+                path.join(opts.appRoot, 'dist', 'ccc')
+            ));
             app.use('/node_modules/bootstrap', serveStatic(path.join(opts.appRoot,
                 'node_modules', 'bootstrap')));
             app.use('/node_modules/font-awesome', serveStatic(path.join(opts.appRoot,
