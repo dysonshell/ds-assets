@@ -74,7 +74,7 @@ exports.lessMiddleware = function (opts) {
             next();
         };
     }
-    var cssPathRegExp = /(?:\/ccc\/[^\/]+|\/assets)\/.*(\.nmq)?\.css($|\?)/i;
+    var cssPathRegExp = /(?:\/ccc\/[^\/]+|\/assets)\/.*?(\.nmq)?\.css($|\?)/i;
     return function (req, res, next) {
         var match = req.url.match(cssPathRegExp);
         if (!match) {
