@@ -2,19 +2,11 @@
 
 var fs = require('fs');
 var path = require('path');
+var co = require('co');
 var less = require('less');
 var rewrite = require('rev-rewriter');
 var errto = require('errto');
 var mqRemove = require('mq-remove');
-
-var rewriteComponentSource = require('@ds/rewrite-component-source');
-
-function getComponentName(dirname, filePath) {
-    var componentRegExp = new RegExp('(\\/ccc\\/[^\\/]+)\\/' + rewrite.escapeRegExp(
-        dirname) + '\\/');
-    var match = filePath.match(componentRegExp);
-    return match && match[1];
-}
 
 exports.renderLess = function (filePath, opts, cb) {
     if (typeof opts === 'function') {
@@ -44,8 +36,6 @@ exports.renderLess = function (filePath, opts, cb) {
         fs.readFile(filePath, 'utf-8', errto(errcb, render));
     }
 
-    var component = getComponentName('css', filePath);
-
     function render(contents) {
         less.render(contents, {
             dumpLineNumbers: opts.debug && 'comments',
@@ -55,11 +45,7 @@ exports.renderLess = function (filePath, opts, cb) {
             sourceMap: opts.debug && sourceMapOptions,
             compress: !opts.debug
         }, errto(errcb, function (output) {
-            if (component) {
-                cb(rewriteComponentSource(filePath, output.css));
-            } else {
-                cb(output.css);
-            }
+            cb(output.css);
         }));
     }
 
@@ -68,6 +54,12 @@ exports.renderLess = function (filePath, opts, cb) {
     }
 };
 
+function exists(filePath) {
+    return new Promise(function (resolve) {
+        fs.exists(filePath, resolve);
+    });
+}
+
 exports.lessMiddleware = function (opts) {
     if (typeof opts.appRoot !== 'string') {
         return function (req, res, next) {
@@ -75,38 +67,37 @@ exports.lessMiddleware = function (opts) {
         };
     }
     var cssPathRegExp = /(?:\/ccc\/[^\/]+|\/assets)\/.*?(\.nmq)?\.css($|\?)/i;
-    return function (req, res, next) {
+    return co.wrap(function * (req, res, next) {
         var match = req.url.match(cssPathRegExp);
         if (!match) {
             return next();
         }
         var noMediaQueries = !! match[1];
-        var filePath = path.join(opts.appRoot, req.path.replace(
-            /(\.nmq)?\.css$/i,
-            '.less'));
-        fs.exists(filePath, function (exists) {
-            if (!exists) {
+        var filePath = path.join(opts.appRoot, req.path.replace(/(\.nmq)?\.css$/i, '.less'));
+        var filePathInModule = filePath.replace('/ccc/', '/node_modules/@ccc/');
+        if (!(yield exists(filePath))) {
+            if (filePath === filePathInModule || !(yield exists((filePath = filePathInModule)))) {
                 return next();
             }
-            exports.renderLess(filePath, opts, function (css) {
-                if (css.match(/\/\*ERROR:/)) {
-                    res.status(500);
-                    res.setHeader('Content-Type',
-                        'text/plain; charset=utf-8');
-                } else {
-                    res.setHeader('Content-Type',
-                        'text/css; charset=utf-8');
-                }
-                if (noMediaQueries) {
-                    res.send(mqRemove(css, {
-                        width: opts.mqRemoveWidth || '1024px'
-                    }));
-                } else {
-                    res.send(css);
-                }
-            });
+        }
+        exports.renderLess(filePath, opts, function (css) {
+            if (css.match(/\/\*ERROR:/)) {
+                res.status(500);
+                res.setHeader('Content-Type',
+                    'text/plain; charset=utf-8');
+            } else {
+                res.setHeader('Content-Type',
+                    'text/css; charset=utf-8');
+            }
+            if (noMediaQueries) {
+                res.send(mqRemove(css, {
+                    width: opts.mqRemoveWidth || '1024px'
+                }));
+            } else {
+                res.send(css);
+            }
         });
-    };
+    });
 };
 
 var st = require('st');
@@ -154,12 +145,22 @@ exports.argmentApp = function (app, opts) {
         if (typeof opts.appRoot === 'string') {
             app.use(exports.lessMiddleware(opts));
             app.use('/ccc', serveStatic(path.join(opts.appRoot, 'ccc'), false));
-            app.use('/node_modules', serveStatic(path.join(opts.appRoot,
-                'node_modules'), false));
-        }
-        if (typeof opts.assetsDirName === 'string') {
-            app.use('/' + opts.assetsDirName, serveStatic(path.join(opts.appRoot,
-                opts.assetsDirName), false));
+            app.use(function (req, res, next) {
+                if (req.url.indexOf('/ccc/') > -1) {
+                    req.cccOriginalUrl = req.url;
+                    req.url = '/node_modules/@' + req.url.substring(1);
+                    delete req.sturl;
+                }
+                next()
+            });
+            app.use('/node_modules', serveStatic(path.join(opts.appRoot, 'node_modules'), false));
+            app.use('/ccc', function (req, res, next) {
+                if (req.cccOriginalUrl) {
+                   req.url = req.cccOriginalUrl;
+                }
+                next()
+            });
+            app.use('/assets', serveStatic(path.join(opts.appRoot, 'assets'), false));
         }
     } else {
         if (typeof opts.appRoot === 'string') {
@@ -170,11 +171,7 @@ exports.argmentApp = function (app, opts) {
                 'node_modules', 'bootstrap')));
             app.use('/node_modules/font-awesome', serveStatic(path.join(opts.appRoot,
                 'node_modules', 'font-awesome')));
-        }
-        if (typeof opts.assetsDirName === 'string') {
-            app.use('/' + opts.assetsDirName, serveStatic(path.join(opts.appRoot,
-                'dist',
-                opts.assetsDirName)));
+            app.use('/assets', serveStatic(path.join(opts.appRoot, 'dist', 'assets')));
         }
     }
 };
