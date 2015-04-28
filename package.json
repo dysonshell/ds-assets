@@ -25,6 +25,7 @@
     "tape": "^3.0.3"
   },
   "dependencies": {
+    "co": "^4.5.2",
     "errto": "^0.2.1",
     "less": "^2.1.1",
     "mq-remove": "0.0.5",
