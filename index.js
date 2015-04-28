@@ -2,23 +2,11 @@
 
 var fs = require('fs');
 var path = require('path');
+var co = require('co');
 var less = require('less');
-var browserify = require('browserify');
-var ecstatic = require('ecstatic');
-var stringify = require('stringify');
 var rewrite = require('rev-rewriter');
-var glob = require('glob');
 var errto = require('errto');
-
-var rewriteComponentSource = require('@ds/render')
-    .rewriteComponentSource;
-
-function getComponentName(componentsDirName, dirname, filePath) {
-    var componentRegExp = new RegExp('(\\/' + componentsDirName +
-        '\\/[^\\/]+)\\/' + rewrite.escapeRegExp(dirname) + '\\/');
-    var match = filePath.match(componentRegExp);
-    return match && match[1];
-}
+var mqRemove = require('mq-remove');
 
 exports.renderLess = function (filePath, opts, cb) {
     if (typeof opts === 'function') {
@@ -31,8 +19,7 @@ exports.renderLess = function (filePath, opts, cb) {
     }
 
     var sourceMapOptions = null;
-    if (!opts.componentsDirName || !filePath.match(new RegExp(opts.componentsDirName +
-        '\\.less$'))) {
+    if (!filePath.match(/ccc\.less$/)) {
         sourceMapOptions = {
             sourceMapFileInline: true,
             outputSourceFiles: true,
@@ -49,21 +36,16 @@ exports.renderLess = function (filePath, opts, cb) {
         fs.readFile(filePath, 'utf-8', errto(errcb, render));
     }
 
-    var component = getComponentName(opts.componentsDirName, 'css', filePath);
-
     function render(contents) {
         less.render(contents, {
-            dumpLineNumbers: 'comments',
+            dumpLineNumbers: opts.debug && 'comments',
             filename: filePath,
             relativeUrls: true,
             paths: [path.dirname(filePath)],
-            sourceMap: sourceMapOptions
+            sourceMap: opts.debug && sourceMapOptions,
+            compress: !opts.debug
         }, errto(errcb, function (output) {
-            if (component) {
-                cb(rewriteComponentSource(filePath, output.css));
-            } else {
-                cb(output.css);
-            }
+            cb(output.css);
         }));
     }
 
@@ -72,148 +54,124 @@ exports.renderLess = function (filePath, opts, cb) {
     }
 };
 
+function exists(filePath) {
+    return new Promise(function (resolve) {
+        fs.exists(filePath, resolve);
+    });
+}
+
 exports.lessMiddleware = function (opts) {
     if (typeof opts.appRoot !== 'string') {
         return function (req, res, next) {
             next();
         };
     }
-    return function (req, res, next) {
-        if (!req.url.match(/\.css($|\?)/i)) {
+    var cssPathRegExp = /(?:\/ccc\/[^\/]+|\/assets)\/.*?(\.nmq)?\.css($|\?)/i;
+    return co.wrap(function * (req, res, next) {
+        var match = req.url.match(cssPathRegExp);
+        if (!match) {
             return next();
         }
-        if (req.path.indexOf('/' + opts.assetsDirName + '/css/') !== 0 && !opts
-            .componentsDirName) {
-            return next();
-        }
-        var filePath = path.join(opts.appRoot, req.path.replace(/\.css$/i,
-            '.less'));
-        fs.exists(filePath, function (exists) {
-            if (!exists) {
+        var noMediaQueries = !! match[1];
+        var filePath = path.join(opts.appRoot, req.path.replace(/(\.nmq)?\.css$/i, '.less'));
+        var filePathInModule = filePath.replace('/ccc/', '/node_modules/@ccc/');
+        if (!(yield exists(filePath))) {
+            if (filePath === filePathInModule || !(yield exists((filePath = filePathInModule)))) {
                 return next();
             }
-            exports.renderLess(filePath, opts, function (css) {
-                if (css.match(/\/\*ERROR:/)) {
-                    res.status(500);
-                    res.setHeader('Content-Type',
-                        'text/plain; charset=utf-8');
-                } else {
-                    res.setHeader('Content-Type',
-                        'text/css; charset=utf-8');
-                }
+        }
+        exports.renderLess(filePath, opts, function (css) {
+            if (css.match(/\/\*ERROR:/)) {
+                res.status(500);
+                res.setHeader('Content-Type',
+                    'text/plain; charset=utf-8');
+            } else {
+                res.setHeader('Content-Type',
+                    'text/css; charset=utf-8');
+            }
+            if (noMediaQueries) {
+                res.send(mqRemove(css, {
+                    width: opts.mqRemoveWidth || '1024px'
+                }));
+            } else {
                 res.send(css);
-            });
-        });
-    };
-};
-
-exports.jsMiddleware = function (opts) {
-    if (typeof opts.appRoot !== 'string') {
-        return function (req, res, next) {
-            next();
-        };
-    }
-    return function (req, res, next) {
-        if (!req.url.match(/\.js($|\?)/i)) {
-            return next();
-        }
-        var component;
-        if (opts.componentsDirName) {
-            component = getComponentName(opts.componentsDirName, 'js/main', req
-                .path);
-        }
-        if (req.path.indexOf('/js/main/') === -1 && !component) {
-            return next();
-        }
-        var filePath = path.join(opts.appRoot, req.path);
-        fs.exists(filePath, function (exists) {
-            if (!exists) {
-                return next();
             }
-            var b = browserify({
-                entries: [filePath],
-                debug: true //TODO: source maps 的文件路径不对
-            });
-            b.transform(stringify(['.tpl', '.html'])); //TODO: works in node-side
-            b.bundle(function (err, body) {
-                if (err) {
-                    console.error(err.stack);
-                    res.status(500);
-                    res.type('txt');
-                    return res.send('/*\n' + err.toString() + '\n' +
-                        err.stack + '\n*\/');
-                }
-                if (body instanceof Buffer) {
-                    body = body.toString('utf-8');
-                }
-                res.type('js');
-                if (component) {
-                    body = rewriteComponentSource(filePath, body); //TODO: 写成 browserify transform
-                }
-                res.send(body);
-            });
         });
-    };
+    });
 };
 
-exports.getComponentsCss = function (opts) {
-    return function (req, res, next) {
-        var pending = 0;
-        var result = [];
-        glob('./' + opts.componentsDirName + '/*/' +
-            '/css/' + opts.componentsDirName +
-            '.less', {
-                cwd: opts.appRoot
-            }, function (error, files) {
-                if (error) {
-                    return next(error);
-                } else if (!files.length) {
-                    return done();
-                }
-                files.forEach(function (filePath) {
-                    pending += 1;
-                    var fullFilePath = path.join(opts.appRoot, filePath);
-                    exports.renderLess(fullFilePath, opts,
-                        function (css) {
-                            result.push(css);
-                            pending -= 1;
-                            if (pending === 0) {
-                                done();
-                            }
-                        });
-                });
-            });
+var st = require('st');
 
-        function done() {
-            res.type('css');
-            res.send(result.join(''));
-        }
+function serveStatic(root, cache) {
+    var opts = {
+        path: root, // resolved against the process cwd
+
+        cache: { // specify cache:false to turn off caching entirely
+            fd: {
+                max: 1000, // number of fd's to hang on to
+                maxAge: 1000 * 60 * 60, // amount of ms before fd's expire
+            },
+
+            stat: {
+                max: 5000, // number of stat objects to hang on to
+                maxAge: 1000 * 60, // number of ms that stats are good for
+            },
+
+            content: {
+                max: 1024 * 1024 * 64, // how much memory to use on caching contents
+                cacheControl: 'public; max-age=31536000' // to set an explicit cache-control
+                // header value
+            }
+        },
+
+        index: false, // return 404's for directories
+
+        dot: false, // default: return 403 for any url with a dot-file part
+
+        passthrough: true, // calls next/returns instead of returning a 404 error
+
+        gzip: true, // default: compresses the response with gzip compression
     };
-};
+    if (cache === false) {
+        opts.cache = false;
+    }
+    return st(opts);
+}
+
 
 exports.argmentApp = function (app, opts) {
     opts = opts || {};
     if (app.get('env') === 'development') { // 只在开发环境做即时编译
         if (typeof opts.appRoot === 'string') {
-            app.use(exports.jsMiddleware(opts));
             app.use(exports.lessMiddleware(opts));
-            if (typeof opts.componentsDirName === 'string' && typeof opts.componentsDirName ===
-                'string') {
-                app.get('/' + opts.assetsDirName + '/css/' + opts.componentsDirName +
-                    '.css',
-                    exports.getComponentsCss(opts));
-                app.use('/' + opts.componentsDirName, ecstatic(
-                    path.join(opts.appRoot, opts.componentsDirName)));
-            }
+            app.use('/ccc', serveStatic(path.join(opts.appRoot, 'ccc'), false));
+            app.use(function (req, res, next) {
+                if (req.url.indexOf('/ccc/') > -1) {
+                    req.cccOriginalUrl = req.url;
+                    req.url = '/node_modules/@' + req.url.substring(1);
+                    delete req.sturl;
+                }
+                next()
+            });
+            app.use('/node_modules', serveStatic(path.join(opts.appRoot, 'node_modules'), false));
+            app.use('/ccc', function (req, res, next) {
+                if (req.cccOriginalUrl) {
+                   req.url = req.cccOriginalUrl;
+                }
+                next()
+            });
+            app.use('/assets', serveStatic(path.join(opts.appRoot, 'assets'), false));
         }
-        if (typeof opts.assetsDirName === 'string') {
-            app.use('/' + opts.assetsDirName, ecstatic(path.join(opts.appRoot,
-                opts.assetsDirName)));
-        }
-        if (app.get('env') !== 'production' && typeof opts.appRoot ===
-            'string') {
-            app.use('/node_modules', ecstatic(path.join(opts.appRoot,
-                'node_modules')));
+    } else {
+        if (typeof opts.appRoot === 'string') {
+            app.use('/ccc', serveStatic(
+                path.join(opts.appRoot, 'dist', 'ccc')
+            ));
+            app.use('/node_modules/bootstrap', serveStatic(path.join(opts.appRoot,
+                'node_modules', 'bootstrap')));
+            app.use('/node_modules/font-awesome', serveStatic(path.join(opts.appRoot,
+                'node_modules', 'font-awesome')));
+            app.use('/assets', serveStatic(path.join(opts.appRoot, 'dist', 'assets')));
         }
     }
 };

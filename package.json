@@ -1,6 +1,6 @@
 {
   "name": "@ds/assets",
-  "version": "0.3.1",
+  "version": "0.5.2",
   "description": "assets middleware module for dysonshell",
   "main": "index.js",
   "files": [
@@ -24,17 +24,11 @@
   "devDependencies": {
     "tape": "^3.0.3"
   },
-  "peerDependencies": {
-    "@ds/base": "^0.2.0",
-    "@ds/render": "^0.4.0"
-  },
   "dependencies": {
-    "browserify": "^7.0.1",
-    "ecstatic": "^0.5.7",
     "errto": "^0.2.1",
-    "glob": "^4.3.1",
     "less": "^2.1.1",
-    "rev-rewriter": "^1.1.0",
-    "stringify": "^3.0.0"
+    "mq-remove": "0.0.5",
+    "rev-rewriter": "^1.1.1",
+    "st": "^0.5.2"
   }
 }
