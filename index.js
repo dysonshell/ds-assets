@@ -141,6 +141,9 @@ function serveStatic(root, cache) {
 
 exports.argmentApp = function (app, opts) {
     opts = opts || {};
+    if (!opts.appRoot && app.set('root')) {
+        opts.appRoot = app.set('root');
+    }
     if (app.get('env') === 'development') { // 只在开发环境做即时编译
         if (typeof opts.appRoot === 'string') {
             app.use(exports.lessMiddleware(opts));
