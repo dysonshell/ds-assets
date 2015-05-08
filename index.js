@@ -139,7 +139,7 @@ function serveStatic(root, cache) {
 }
 
 
-exports.argmentApp = function (app, opts) {
+exports.augmentApp = function (app, opts) {
     opts = opts || {};
     if (!opts.appRoot && app.set('root')) {
         opts.appRoot = app.set('root');
