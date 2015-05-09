@@ -67,6 +67,7 @@ exports.lessMiddleware = function (opts) {
         };
     }
     var cssPathRegExp = /(?:\/ccc\/[^\/]+|\/assets)\/.*?(\.nmq)?\.css($|\?)/i;
+    var cacheBase;
     return co.wrap(function * (req, res, next) {
         var match = req.url.match(cssPathRegExp);
         if (!match) {
@@ -80,15 +81,25 @@ exports.lessMiddleware = function (opts) {
                 return next();
             }
         }
+        var isBase = !!filePath.match(/\/ccc\/global\/css\/base.less/g);
+        if (isBase && cacheBase) {
+            res.type('css');
+            sendCss(cacheBase);
+            return;
+        }
         exports.renderLess(filePath, opts, function (css) {
             if (css.match(/\/\*ERROR:/)) {
                 res.status(500);
-                res.setHeader('Content-Type',
-                    'text/plain; charset=utf-8');
+                res.type('txt');
             } else {
-                res.setHeader('Content-Type',
-                    'text/css; charset=utf-8');
+                res.type('css');
             }
+            sendCss(css);
+            if (isBase && !cacheBase) {
+                cacheBase = css;
+            }
+        });
+        function sendCss(css) {
             if (noMediaQueries) {
                 res.send(mqRemove(css, {
                     width: opts.mqRemoveWidth || '1024px'
@@ -96,7 +107,7 @@ exports.lessMiddleware = function (opts) {
             } else {
                 res.send(css);
             }
-        });
+        }
     });
 };
 
