@@ -26,9 +26,7 @@ exports.augmentApp = function (app, opts) {
             noMediaQueries = true;
             return m2;
         }));
-        console.log(filePath);
         var filePathInModule = filePath.replace(['', 'ccc', ''].join(path.sep), ['', 'node_modules', '@ccc', ''].join(path.sep));
-        console.log(filePathInModule);
         if (!(yield exists(filePath))) {
             if (filePath === filePathInModule || !(yield exists((filePath = filePathInModule)))) {
                 return next();

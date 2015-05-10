@@ -3,7 +3,13 @@
   "version": "2.0.0",
   "description": "assets middleware module for dysonshell",
   "main": "index.js",
+  "bin": {
+    "ds-less": "compile-less.sh",
+    "ds-less-watch": "watch-compile-less.sh"
+  },
   "files": [
+    "compile-less.sh",
+    "watch-compile-less.sh",
     "index.js"
   ],
   "scripts": {
