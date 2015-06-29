@@ -5,8 +5,7 @@ var fs = require('fs');
 var path = require('path');
 var assert = require('assert');
 var co = require('co');
-// var less = require('less');
-// var rewrite = require('rev-rewriter');
+var css = require('css');
 var mqRemove = require('mq-remove');
 var errto = require('errto');
 var serveStatic = require('serve-static');
@@ -33,16 +32,18 @@ exports.augmentApp = function (app, opts) {
             }
         }
         if (filePath.match(/\.css$/)) {
+            res.type('css');
             var content = yield readFile(filePath);
-            var mqRemoved = mqRemove(content, {
-                width: opts.mqRemoveWidth || '1024px'
-            });
+            var parsed = css.parse(content);
+        } else {
+            return next();
         }
         if (!noMediaQueries) {
-            return res.sendFile(filePath);
+            return res.send(content);
         } else {
-            res.type('css');
-            res.send(mqRemoved);
+            res.send(mqRemove(parsed, {
+                width: opts.mqRemoveWidth || '1024px'
+            }));
         }
     }), function (err, req, res, next) {
         res.statusCode = 500;
