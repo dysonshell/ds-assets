@@ -36,8 +36,9 @@
   "dependencies": {
     "@ds/common": "*",
     "co": "^4.5.2",
+    "css": "^2.2.0",
     "errto": "^0.2.1",
-    "mq-remove": "^0.0.6",
+    "mq-remove": "0.0.7",
     "serve-static": "^1.9.2"
   }
 }
