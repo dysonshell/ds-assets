@@ -35,15 +35,15 @@ exports.augmentApp = function (app, opts) {
             res.type('css');
             var content = yield readFile(filePath);
             var parsed = css.parse(content);
+            if (!noMediaQueries) {
+                return res.send(content);
+            } else {
+                res.send(mqRemove(parsed, {
+                    width: opts.mqRemoveWidth || '1024px'
+                }));
+            }
         } else {
-            return next();
-        }
-        if (!noMediaQueries) {
-            return res.send(content);
-        } else {
-            res.send(mqRemove(parsed, {
-                width: opts.mqRemoveWidth || '1024px'
-            }));
+            return res.sendFile(filePath);
         }
     }), function (err, req, res, next) {
         res.statusCode = 500;
