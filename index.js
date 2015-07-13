@@ -39,7 +39,7 @@ exports.augmentApp = function (app, opts) {
                 return res.send(content);
             } else {
                 res.send(mqRemove(parsed, {
-                    width: opts.mqRemoveWidth || '1024px'
+                    width: opts.mqRemoveWidth || '1200px'
                 }));
             }
         } else {
