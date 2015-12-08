@@ -1,6 +1,6 @@
 {
-  "name": "@ds/assets",
-  "version": "2.0.6",
+  "name": "ds-assets",
+  "version": "0.0.0",
   "description": "assets middleware module for dysonshell",
   "main": "index.js",
   "bin": {
@@ -17,7 +17,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "ssh://git@gitlab.creditcloud.com:10022/ccfe/ds-assets.git"
+    "url": "ssh://git@github.com/dysonshell/ds-assets.git"
   },
   "keywords": [
     "render"
@@ -26,7 +26,7 @@
     "name": "undoZen",
     "email": "opensource@undozen.com"
   },
-  "license": "private",
+  "license": "MIT",
   "devDependencies": {
     "express": "^4.13.3",
     "promisingagent": "^4.3.0",
