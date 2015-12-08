@@ -36,7 +36,7 @@ exports.augmentApp = function (app) {
             });
         }
         var filePath = path.join(APP_ROOT, DSC, reqPath);
-        var filePathInModule = filePath.replace(['', DSC, ''].join(path.sep), ['', 'node_modules', '@'+DSC, ''].join(path.sep));
+        var filePathInModule = filePath.replace(['', DSC.replace(/\/+$/, ''), ''].join(path.sep), ['', 'node_modules', '@'+DSC.replace(/\/+$/, ''), ''].join(path.sep));
         if (!(yield exists(filePath))) {
             if (filePath === filePathInModule || !(yield exists((filePath = filePathInModule)))) {
                 return next();
