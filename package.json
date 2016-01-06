@@ -13,7 +13,8 @@
     "index.js"
   ],
   "scripts": {
-    "test": "tape test/cases/*.js"
+    "test": "rm -rf coverage/ && prove --exec \"istanbul cover --include-pid --report none --print none\" test/cases/*.js && istanbul report --report cobertura --report html --report text-summary",
+    "test-watch": "nodemon -w test/ -w index.js --exec \"tape test/cases/*.js\""
   },
   "repository": {
     "type": "git",
@@ -29,12 +30,13 @@
   "license": "MIT",
   "devDependencies": {
     "express": "^4.13.3",
+    "istanbul-harmony": "^0.3.16",
     "promisingagent": "^4.3.0",
     "tape": "^4.0.0"
   },
   "dependencies": {
     "co": "^4",
-    "conext": "^1",
+    "conext": "^2",
     "config": "^1",
     "css": "^2",
     "errto": "^0.2",

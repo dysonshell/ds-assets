@@ -5,7 +5,6 @@ var path = require('path');
 var assert = require('assert');
 var config = require('config');
 assert(config.dsAppRoot);
-var co = require('co');
 var css = require('css');
 var mqRemove = require('mq-remove');
 var errto = require('errto');
@@ -20,7 +19,6 @@ var mqWidth = config.dsMediaQueryRemoveWidth || '1200px';
 var supportIE8 = config.dsSupportIE8;
 
 exports.augmentApp = function (app) {
-    assert(APP_ROOT);
     if (app.get('env') !== 'development') { // production 应该用 nginx
         return;
     }
@@ -48,19 +46,23 @@ exports.augmentApp = function (app) {
             if (!supportIE8 || !noMediaQueries) {
                 return res.send(content);
             } else {
-                var parsed = css.parse(content);
-                res.send(mqRemove(parsed, {
-                    width: mqWidth,
-                }));
+                try {
+                    var parsed = css.parse(content);
+                    content = mqRemove(parsed, {
+                        type: 'screen',
+                        width: mqWidth,
+                    })
+                    res.send(content);
+                } catch (err) {
+                    res.statusCode = 500;
+                    res.set('Content-Type', 'text/css');
+                    res.end('/* CSS 文件解析发生错误，会影响发布编译过程，请将文件按照下面的错误提示改正：\n\n'+(err.stack||err.toString())+'\n*/');
+                }
             }
         } else {
             return res.sendFile(filePath);
         }
-    }), function (err, req, res, next) {
-        res.statusCode = 500;
-        res.set('Content-Type', 'text/css');
-        res.end('/* CSS 文件解析发生错误，会影响发布编译过程，请将文件按照下面的错误提示改正：\n\n'+(err.stack||err.toString())+'\n*/');
-    });
+    }));
     app.use('/node_modules', serveStatic(path.join(APP_ROOT, 'node_modules')));
 };
 
