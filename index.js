@@ -34,7 +34,7 @@ exports.augmentApp = function (app) {
             });
         }
         var filePath = path.join(APP_ROOT, DSC, reqPath);
-        if (!(yield exists(filePath))) {
+        if (reqPath.indexOf('/js/main/') > -1 || !(yield exists(filePath))) {
             return next();
         }
         if (filePath.match(/\.css$/)) {
