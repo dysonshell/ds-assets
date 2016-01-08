@@ -1,6 +1,6 @@
 {
   "name": "ds-assets",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "assets middleware module for dysonshell",
   "main": "index.js",
   "bin": {
