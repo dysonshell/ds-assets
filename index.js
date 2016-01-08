@@ -34,30 +34,27 @@ exports.augmentApp = function (app) {
             });
         }
         var filePath = path.join(APP_ROOT, DSC, reqPath);
-        var filePathInModule = filePath.replace(['', DSC.replace(/\/+$/, ''), ''].join(path.sep), ['', 'node_modules', '@'+DSC.replace(/\/+$/, ''), ''].join(path.sep));
         if (!(yield exists(filePath))) {
-            if (filePath === filePathInModule || !(yield exists((filePath = filePathInModule)))) {
-                return next();
-            }
+            return next();
         }
         if (filePath.match(/\.css$/)) {
             res.type('css');
             var content = yield readFile(filePath);
-            if (!supportIE8 || !noMediaQueries) {
-                return res.send(content);
-            } else {
-                try {
-                    var parsed = css.parse(content);
+            try {
+                var parsed = css.parse(content);
+                if (!supportIE8 || !noMediaQueries) {
                     content = mqRemove(parsed, {
                         type: 'screen',
                         width: mqWidth,
                     })
-                    res.send(content);
-                } catch (err) {
-                    res.statusCode = 500;
-                    res.set('Content-Type', 'text/css');
-                    res.end('/* CSS 文件解析发生错误，会影响发布编译过程，请将文件按照下面的错误提示改正：\n\n'+(err.stack||err.toString())+'\n*/');
+                } else {
+                    content = css.stringify(parsed);
                 }
+                res.send(content);
+            } catch (err) {
+                res.statusCode = 500;
+                res.set('Content-Type', 'text/css');
+                res.end('/* CSS 文件解析发生错误，会影响发布编译过程，请将文件按照下面的错误提示改正：\n\n'+(err.stack||err.toString())+'\n*/');
             }
         } else {
             return res.sendFile(filePath);
